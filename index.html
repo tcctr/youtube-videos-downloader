@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube Videos Downloader</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --card: #ffffff; --text: #1c1c1a; --muted: #6b6b66;
+    --border: #e2e2dd; --accent: #d94f2b; --accent-text: #fff; --ok: #2f8f4e; --err: #c0392b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151514; --card: #1f1f1d; --text: #ecece8; --muted: #9a9a94;
+            --border: #33332f; --accent: #ef6a45; --ok: #4fbf72; --err: #e5675a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 820px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .row { display: flex; gap: 8px; }
+  input[type=url] { flex: 1; min-width: 0; padding: 12px 14px; font-size: 15px; border-radius: 10px;
+         border: 1px solid var(--border); background: var(--card); color: var(--text); }
+  button, select { padding: 10px 16px; font-size: 14px; border-radius: 10px; border: 1px solid var(--border);
+         background: var(--card); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-top: 20px; }
+  .preview { display: flex; gap: 16px; }
+  .preview img { width: 240px; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; background: var(--border); flex-shrink: 0; }
+  .preview h2 { font-size: 17px; margin: 0 0 6px; }
+  .meta { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .desc { color: var(--muted); font-size: 13px; margin-top: 10px; white-space: pre-wrap; max-height: 90px; overflow: auto; }
+  .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .pl-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; font-size: 13px; }
+  .pl-bar input[type=search] { flex: 1; min-width: 140px; padding: 8px 10px; border-radius: 8px;
+         border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 13px; }
+  .pl-bar label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .entries { max-height: 460px; overflow: auto; margin-top: 10px; font-size: 13px; border-top: 1px solid var(--border); }
+  .entry { border-bottom: 1px solid var(--border); }
+  .entry-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; }
+  .entry-row input { flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; }
+  .entry-row img { width: 88px; aspect-ratio: 16/9; object-fit: cover; border-radius: 4px; background: var(--border); flex-shrink: 0; }
+  .entry-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entry-row .small { flex-shrink: 0; }
+  .entry-row button { padding: 4px 10px; font-size: 12px; border-radius: 6px; flex-shrink: 0; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 20px; align-items: center; }
+  .tabs .chan { font-weight: 600; margin-right: 6px; }
+  .tabs button { padding: 7px 14px; font-size: 13px; border-radius: 999px; }
+  .tabs button.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .back { background: none; border: 0; color: var(--accent); padding: 0; font-size: 13px; margin-top: 14px; }
+  .pl-bar select, .pl-bar input[type=number] { padding: 7px 8px; font-size: 13px; border-radius: 8px; background: var(--bg); }
+  .pl-bar input[type=number] { width: 64px; border: 1px solid var(--border); color: var(--text); }
+  .sub-list { margin: 0 0 4px 34px; border-left: 2px solid var(--border); padding-left: 10px; }
+  .sub-head { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; color: var(--muted); }
+  .sub-entry { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+  .sub-entry input { flex-shrink: 0; }
+  .sub-entry .entry-title { font-size: 12.5px; }
+  .sub-entry.off .entry-title { opacity: .45; }
+  .entry-row button.open { border-color: var(--accent); color: var(--accent); }
+  .entry.off .entry-row img, .entry.off .entry-title { opacity: .45; }
+  .entry-details { padding: 0 4px 12px 30px; }
+  .entry-details .desc { max-height: 120px; }
+  @media (max-width: 600px) { .entry-row img { display: none; } }
+  .error { color: var(--err); margin-top: 12px; white-space: pre-wrap; }
+  .settings { padding: 0; }
+  .settings summary { padding: 14px 16px; cursor: pointer; font-weight: 600; font-size: 14px; }
+  .settings-body { padding: 0 16px 16px; display: grid; gap: 12px; font-size: 14px; }
+  .settings-body label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .settings-body .line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .settings-body code { background: var(--bg); padding: 4px 8px; border-radius: 6px; font-size: 12.5px; word-break: break-all; }
+  .settings-body input[type=text] { width: 120px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border);
+         background: var(--bg); color: var(--text); font-size: 13px; }
+  .settings-body button { padding: 6px 12px; font-size: 13px; }
+  .hint { font-size: 12px; color: var(--muted); margin-left: 24px; margin-top: -8px; }
+  .job-top { display: flex; align-items: center; gap: 10px; }
+  .job-top .t { flex: 1; min-width: 0; }
+  .job-top button { padding: 3px 10px; font-size: 12px; border-radius: 6px; flex-shrink: 0; }
+  .job.skipped .bar span, .job.cancelled .bar span { background: var(--muted); }
+  .head-btns { display: flex; gap: 8px; }
+  .entry-row input, .sub-entry { user-select: none; }
+  .jobs-head { display: flex; justify-content: space-between; align-items: center; margin-top: 32px; }
+  .jobs-head h3 { margin: 0; font-size: 16px; }
+  .job { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .job:last-child { border-bottom: 0; }
+  .job .t { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar { height: 6px; background: var(--border); border-radius: 3px; margin: 8px 0 4px; overflow: hidden; }
+  .bar span { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+  .job.done .bar span { background: var(--ok); }
+  .job.error .bar span { background: var(--err); }
+  .small { font-size: 12px; color: var(--muted); }
+  .empty { color: var(--muted); font-size: 14px; }
+  @media (max-width: 600px) {
+    .preview { flex-direction: column; }
+    .preview img { width: 100%; }
+    .row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>YouTube Videos Downloader</h1>
+  <p class="sub">Paste a video, playlist or channel link to see what it is, then download it.</p>
+
+  <form class="row" id="form">
+    <input type="url" id="url" placeholder="https://www.youtube.com/watch?v=…" required autofocus>
+    <button class="primary" id="lookBtn" type="submit">Look up</button>
+  </form>
+
+  <details class="card settings" id="settingsBox">
+    <summary>Settings</summary>
+    <div class="settings-body">
+      <div class="line">Save to <code id="dirPath">…</code> <button type="button" id="chooseDir">Choose…</button></div>
+      <label><input type="checkbox" data-setting="organise"> Organise into Channel / Playlist folders</label>
+      <label><input type="checkbox" data-setting="length_folders"> Add length folders (30min, 45min, 55min…)</label>
+      <div class="hint">Lengths are rounded to the nearest 5 minutes, so a 28:40 video goes into 30min.</div>
+      <label><input type="checkbox" data-setting="skip_existing"> Skip videos I've already downloaded</label>
+      <label><input type="checkbox" data-setting="embed"> Embed thumbnail, chapters and video info in the file</label>
+      <div class="line">
+        <label><input type="checkbox" data-setting="subs"> Subtitles, languages</label>
+        <input type="text" data-setting="sub_langs" placeholder="en.*">
+      </div>
+      <div class="hint">e.g. <code>en.*</code> or <code>en.*,pt.*</code>. Subtitles are embedded in video files, not audio-only ones.</div>
+      <div class="small">Files are saved as <code id="pathPreview"></code></div>
+      <div class="line"><span>yt-dlp <span id="ver">…</span></span>
+        <button type="button" id="updateBtn">Update yt-dlp</button> <span class="small" id="updMsg"></span></div>
+    </div>
+  </details>
+
+  <div id="tabs" class="tabs"></div>
+  <div id="result"></div>
+
+  <div class="jobs-head">
+    <h3>Downloads</h3>
+    <div class="head-btns">
+      <button id="clearJobs" type="button">Clear finished</button>
+      <button id="openFolder" type="button">Open folder</button>
+    </div>
+  </div>
+  <div class="card" id="jobs"><div class="empty">Nothing downloaded yet.</div></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const dur = (s) => { if (!s) return ""; s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60;
+  return (h ? h + ":" + String(m).padStart(2,"0") : m) + ":" + String(x).padStart(2,"0"); };
+const date = (d) => d ? `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}` : "";
+
+let current = null;   // { url, info } currently shown
+let channel = null;   // { base, name, tab } when browsing a channel
+let selectedTargets = () => [];  // set by setupPlaylist
+
+const TABS = [["videos", "Videos"], ["shorts", "Shorts"], ["streams", "Live"], ["playlists", "Playlists"], ["podcasts", "Podcasts"]];
+const CHANNEL_RE = /^(https?:\/\/(?:www\.|m\.)?youtube\.com\/(?:@[^/?#]+|channel\/[^/?#]+|c\/[^/?#]+|user\/[^/?#]+))(?:\/(videos|shorts|streams|playlists|podcasts|featured|live)?)?\/?(?:[?#].*)?$/i;
+
+async function post(path, body) {
+  const r = await fetch(path, { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || "Request failed");
+  return j;
+}
+
+$("form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const url = $("url").value.trim();
+  const m = url.match(CHANNEL_RE);
+  if (m) {
+    const tab = TABS.some(([t]) => t === (m[2] || "").toLowerCase()) ? m[2].toLowerCase() : "videos";
+    channel = { base: m[1], name: decodeURIComponent(m[1].split("/").pop()), tab };
+    openTab(tab);
+  } else {
+    channel = null;
+    $("tabs").innerHTML = "";
+    lookup(url);
+  }
+});
+
+function renderTabs() {
+  if (!channel) { $("tabs").innerHTML = ""; return; }
+  $("tabs").innerHTML = `<span class="chan">${esc(channel.name)}</span>` +
+    TABS.map(([t, l]) => `<button type="button" data-tab="${t}" class="${channel.tab === t ? "on" : ""}">${l}</button>`).join("");
+  $("tabs").querySelectorAll("button").forEach(b => b.onclick = () => openTab(b.dataset.tab));
+}
+
+function openTab(tab) {
+  channel.tab = tab;
+  renderTabs();
+  lookup(`${channel.base}/${tab}`);
+}
+
+async function lookup(url) {
+  $("lookBtn").disabled = true; $("lookBtn").textContent = "Looking…";
+  $("result").innerHTML = `<div class="card small">Loading… big channels can take 20–30 seconds.</div>`;
+  try {
+    const info = await post("/api/info", { url });
+    current = { url, info };
+    render(info);
+  } catch (err) {
+    const msg = /does not have a .* tab/i.test(err.message) ? "This channel has nothing in this section." : err.message;
+    $("result").innerHTML = `<div class="error">${esc(msg)}</div>`;
+  } finally {
+    $("lookBtn").disabled = false; $("lookBtn").textContent = "Look up";
+  }
+}
+
+function formatOptions(heights) {
+  const res = [2160, 1440, 1080, 720, 480].filter(h => !heights.length || heights.some(x => x >= h));
+  return [["best", "Best quality (mp4)"], ...res.map(h => [String(h), h + "p (mp4)"]),
+          ["mp3", "Audio only (mp3)"], ["m4a", "Audio only (m4a)"]];
+}
+
+function render(i) {
+  const heights = i.heights || [];
+  const isList = i.is_playlist && i.entries?.length;
+  const playlistCount = isList ? i.entries.filter(e => e.kind === "playlist").length : 0;
+  const meta = [
+    i.uploader && esc(i.uploader),
+    i.duration && "⏱ " + dur(i.duration),
+    i.view_count && Number(i.view_count).toLocaleString() + " views",
+    i.upload_date && date(i.upload_date),
+    i.extractor && esc(i.extractor),
+    heights.length && "up to " + heights[0] + "p",
+    isList && (playlistCount ? `${playlistCount} playlists` : `${i.entries.length} videos`),
+    isList && totalTime(i.entries),
+  ].filter(Boolean).map(x => `<span>${x}</span>`).join("");
+  const entries = isList ? `
+    <div class="pl-bar">
+      <label><input type="checkbox" id="selAll"> Select all</label>
+      <span class="small" id="selCount"></span>
+      <input type="search" id="filter" placeholder="Filter by title…">
+    </div>
+    <div class="pl-bar">
+      <select id="sort">
+        <option value="orig">Channel order</option>
+        <option value="rev">Reverse order</option>
+        <option value="long">Longest first</option>
+        <option value="short">Shortest first</option>
+        <option value="views">Most viewed</option>
+        <option value="az">Title A–Z</option>
+      </select>
+      <span class="small">Length</span>
+      <input type="number" id="minLen" min="0" placeholder="min"> <span class="small">to</span>
+      <input type="number" id="maxLen" min="0" placeholder="max"> <span class="small">minutes</span>
+    </div>
+    <div class="entries">${
+    i.entries.map((e, n) => `
+      <div class="entry" data-i="${n}">
+        <div class="entry-row">
+          <input type="checkbox" class="pick" data-i="${n}">
+          ${e.thumbnail ? `<img src="${esc(e.thumbnail)}" alt="" loading="lazy">` : ""}
+          <span class="entry-title" title="${esc(e.title)}">${n+1}. ${esc(e.title)}</span>
+          <span class="small">${e.kind === "playlist" ? "playlist" : dur(e.duration)}${e.view_count ? " · " + compact(e.view_count) : ""}</span>
+          ${e.kind === "playlist"
+            ? `<button type="button" class="open" data-i="${n}">Open</button>`
+            : `<button type="button" class="more" data-i="${n}">Details</button>`}
+        </div>
+        <div class="entry-details" hidden></div>
+      </div>`).join("")
+  }</div>` : "";
+  $("result").innerHTML = `
+    <div class="card">
+      <div class="preview">
+        ${i.thumbnail ? `<img src="${esc(i.thumbnail)}" alt="">` : ""}
+        <div style="min-width:0">
+          <h2>${esc(i.title || "Untitled")}</h2>
+          <div class="meta">${meta}</div>
+          ${i.description ? `<div class="desc">${esc(i.description)}</div>` : ""}
+        </div>
+      </div>
+      ${entries}
+      <div class="actions">
+        <select id="fmt">${formatOptions(heights).map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>
+        <button class="primary" id="dlBtn" type="button">Download</button>
+      </div>
+    </div>`;
+  if (isList) setupPlaylist(i.entries);
+  $("dlBtn").onclick = async () => {
+    const fmt = $("fmt").value;
+    const targets = isList
+      ? selectedTargets()
+      : [{ url: current.url, title: i.title, kind: "video" }];
+    if (!targets.length) return;
+    $("dlBtn").disabled = true;
+    try {
+      // Videos picked from a pasted playlist (not a channel tab) go into that playlist's folder
+      const listName = !channel && i.is_playlist ? i.title : "";
+      for (const t of targets) await post("/api/download", {
+        url: t.url, title: t.title, format: fmt, kind: t.kind || "video",
+        group: t.group || (t.kind === "playlist" ? "" : listName),
+      });
+      poll();
+    } catch (err) { alert(err.message); }
+    $("dlBtn").disabled = false;
+  };
+}
+
+// Shift-click a checkbox to set every visible checkbox between it and the last one clicked
+function rangeClicker(getBoxes, apply) {
+  let last = null;
+  return (e) => {
+    const c = e.target, boxes = getBoxes().filter(b => !b.closest("[hidden]"));
+    if (e.shiftKey && last && boxes.includes(last) && last !== c) {
+      const [a, b] = [boxes.indexOf(last), boxes.indexOf(c)].sort((x, y) => x - y);
+      boxes.slice(a, b + 1).forEach(x => apply(x, c.checked));
+    }
+    last = c;
+  };
+}
+
+const compact = (n) => Intl.NumberFormat("en", { notation: "compact" }).format(n) + " views";
+function totalTime(list) {
+  const s = list.reduce((a, e) => a + (e.duration || 0), 0);
+  return s ? "total " + (s >= 3600 ? Math.round(s / 360) / 10 + " h" : Math.round(s / 60) + " min") : "";
+}
+
+function setupPlaylist(list) {
+  const picks = [...document.querySelectorAll(".pick")];
+  const rows = [...document.querySelectorAll(".entry")];
+  const box = document.querySelector(".entries");
+  const subLists = {};  // playlist row index -> its videos, once expanded
+  const subPicks = (n) => [...rows[n].querySelectorAll(".subpick")];
+  selectedTargets = () => picks.flatMap(c => {
+    const n = c.dataset.i;
+    if (subLists[n]) return subPicks(n).filter(s => s.checked).map(s => ({ ...subLists[n][s.dataset.j], group: list[n].title }));
+    return c.checked ? [list[n]] : [];
+  });
+  const update = () => {
+    // An expanded playlist's checkbox mirrors its videos: all, some or none ticked
+    picks.forEach(c => {
+      const n = c.dataset.i;
+      if (subLists[n]) {
+        const subs = subPicks(n), on = subs.filter(s => s.checked).length;
+        c.checked = on === subs.length && on > 0;
+        c.indeterminate = on > 0 && on < subs.length;
+        subs.forEach(s => s.closest(".sub-entry").classList.toggle("off", !s.checked));
+        rows[n].querySelector(".sub-count").textContent = `${on} of ${subs.length} selected`;
+      }
+      c.closest(".entry").classList.toggle("off", !c.checked && !c.indeterminate);
+    });
+    const n = picks.filter(c => c.checked || c.indeterminate).length;
+    const t = selectedTargets(), pls = t.filter(x => x.kind === "playlist").length, vids = t.length - pls;
+    $("selCount").textContent = `${n} of ${list.length} selected`;
+    $("selAll").checked = n === list.length && !picks.some(c => c.indeterminate);
+    $("selAll").indeterminate = n > 0 && !$("selAll").checked;
+    const parts = [vids && `${vids} video${vids > 1 ? "s" : ""}`, pls && `${pls} playlist${pls > 1 ? "s" : ""}`].filter(Boolean);
+    $("dlBtn").textContent = t.length ? `Download ${parts.join(" + ")}` : "Nothing selected";
+    $("dlBtn").disabled = !t.length;
+  };
+  const setPick = (c, on) => {
+    c.checked = on; c.indeterminate = false;
+    if (subLists[c.dataset.i]) subPicks(c.dataset.i).forEach(s => s.checked = on);
+  };
+  // Title and length filters only hide rows; ticks are kept
+  const applyFilters = () => {
+    const q = $("filter").value.toLowerCase();
+    const min = parseFloat($("minLen").value), max = parseFloat($("maxLen").value);
+    rows.forEach(row => {
+      const e = list[row.dataset.i], m = (e.duration || 0) / 60;
+      row.hidden = (q && !(e.title || "").toLowerCase().includes(q)) ||
+        (!isNaN(min) && (!e.duration || m < min)) || (!isNaN(max) && (!e.duration || m > max));
+    });
+  };
+  const sorters = {
+    orig: (a, b) => a - b,
+    rev: (a, b) => b - a,
+    long: (a, b) => (list[b].duration || 0) - (list[a].duration || 0),
+    short: (a, b) => (list[a].duration || Infinity) - (list[b].duration || Infinity),
+    views: (a, b) => (list[b].view_count || 0) - (list[a].view_count || 0),
+    az: (a, b) => (list[a].title || "").localeCompare(list[b].title || ""),
+  };
+  $("sort").onchange = (e) => {
+    rows.slice().sort((x, y) => sorters[e.target.value](+x.dataset.i, +y.dataset.i)).forEach(r => box.appendChild(r));
+  };
+  const pickRange = rangeClicker(() => [...box.querySelectorAll(".pick")], setPick);
+  picks.forEach(c => {
+    c.onclick = pickRange;
+    c.onchange = () => { setPick(c, c.checked); update(); };
+  });
+  // "Select all" only affects rows currently visible through the filters
+  $("selAll").onchange = (e) => {
+    picks.forEach(c => { if (!c.closest(".entry").hidden) setPick(c, e.target.checked); });
+    update();
+  };
+  ["filter", "minLen", "maxLen"].forEach(id => $(id).oninput = applyFilters);
+  document.querySelectorAll(".open").forEach(btn => btn.onclick = async () => {
+    const n = btn.dataset.i, details = rows[n].querySelector(".entry-details");
+    if (!details.hidden) { details.hidden = true; btn.textContent = "Open"; return; }
+    details.hidden = false; btn.textContent = "Close";
+    if (details.dataset.loaded) return;
+    details.innerHTML = `<div class="small" style="padding-left:34px">Loading playlist…</div>`;
+    try {
+      const d = await post("/api/info", { url: list[n].url });
+      const vids = (d.entries || []).filter(v => v.url);
+      details.dataset.loaded = "1";
+      const on = picks[n].checked;
+      details.innerHTML = `<div class="sub-list">
+        <div class="sub-head"><span class="sub-count"></span><span>· ${totalTime(vids)}</span></div>
+        ${vids.map((v, j) => `
+          <label class="sub-entry">
+            <input type="checkbox" class="subpick" data-j="${j}" ${on ? "checked" : ""}>
+            <span class="entry-title" title="${esc(v.title)}">${j+1}. ${esc(v.title)}</span>
+            <span class="small">${dur(v.duration)}</span>
+          </label>`).join("") || `<div class="small">This playlist is empty.</div>`}
+      </div>`;
+      subLists[n] = vids;
+      const subRange = rangeClicker(() => subPicks(n), (x, on) => x.checked = on);
+      subPicks(n).forEach(s => { s.onclick = subRange; s.onchange = update; });
+      update();
+    } catch (err) {
+      details.innerHTML = `<div class="error">${esc(err.message)}</div>`;
+    }
+  });
+  document.querySelectorAll(".more").forEach(btn => btn.onclick = async () => {
+    const box = btn.closest(".entry").querySelector(".entry-details");
+    if (!box.hidden) { box.hidden = true; btn.textContent = "Details"; return; }
+    box.hidden = false; btn.textContent = "Hide";
+    if (box.dataset.loaded) return;
+    box.innerHTML = `<div class="small">Loading…</div>`;
+    try {
+      const d = await post("/api/info", { url: list[btn.dataset.i].url });
+      box.dataset.loaded = "1";
+      const meta = [
+        d.uploader && esc(d.uploader),
+        d.duration && "⏱ " + dur(d.duration),
+        d.view_count && Number(d.view_count).toLocaleString() + " views",
+        d.upload_date && date(d.upload_date),
+        d.heights?.length && "up to " + d.heights[0] + "p",
+      ].filter(Boolean).map(x => `<span>${x}</span>`).join("");
+      box.innerHTML = `<div class="meta">${meta}</div>${d.description ? `<div class="desc">${esc(d.description)}</div>` : ""}`;
+    } catch (err) {
+      box.innerHTML = `<div class="error">${esc(err.message)}</div>`;
+    }
+  });
+  update();
+}
+
+let timer = null;
+async function poll() {
+  const { jobs } = await (await fetch("/api/jobs")).json();
+  if (!jobs.length) $("jobs").innerHTML = `<div class="empty">Nothing downloaded yet.</div>`;
+  else {
+    $("jobs").innerHTML = jobs.slice().reverse().map(j => `
+      <div class="job ${j.status}">
+        <div class="job-top">
+          <div class="t">${esc(j.title)}</div>
+          ${j.status === "queued" || j.status === "running" ? `<button type="button" data-cancel="${j.id}">Cancel</button>` : ""}
+          ${j.status === "error" || j.status === "cancelled" ? `<button type="button" data-retry="${j.id}">Retry</button>` : ""}
+        </div>
+        <div class="bar"><span style="width:${parseFloat(j.percent) || 0}%"></span></div>
+        <div class="small">${
+          j.status === "queued" ? "Queued…" :
+          j.status === "running" ? `${esc(j.percent)} · ${esc(j.speed)} · ETA ${esc(j.eta)}` :
+          j.status === "done" ? `Done · ${esc(j.format)} · ${j.files > 1 ? j.files + " files" : esc(shortPath(j.file))}` :
+          j.status === "skipped" ? "Already downloaded, skipped" :
+          j.status === "cancelled" ? "Cancelled" :
+          `Failed: ${esc(j.error)}`}</div>
+      </div>`).join("");
+  }
+  clearTimeout(timer);
+  if (jobs.some(j => j.status === "running" || j.status === "queued")) timer = setTimeout(poll, 1000);
+}
+
+const shortPath = (f) => settings.download_dir && f.startsWith(settings.download_dir) ? f.slice(settings.download_dir.length + 1) : f.split("/").pop();
+
+$("jobs").onclick = async (e) => {
+  const id = e.target.dataset.cancel || e.target.dataset.retry;
+  if (!id) return;
+  e.target.disabled = true;
+  await post(e.target.dataset.cancel ? "/api/cancel" : "/api/retry", { id }).catch(err => alert(err.message));
+  poll();
+};
+$("clearJobs").onclick = () => post("/api/clear", {}).then(poll);
+$("openFolder").onclick = () => post("/api/open-folder", {}).catch(() => {});
+
+// ---------- Settings ----------
+let settings = {};
+function showSettings() {
+  $("dirPath").textContent = settings.download_dir;
+  $("ver").textContent = settings.version || "";
+  document.querySelectorAll("[data-setting]").forEach(el => {
+    const v = settings[el.dataset.setting];
+    if (el.type === "checkbox") el.checked = !!v; else el.value = v ?? "";
+  });
+  const parts = settings.organise ? ["Channel", "Playlist"] : [];
+  if (settings.length_folders) parts.push("45min");
+  $("pathPreview").textContent = [...parts, "Video title [id].mp4"].join("/");
+}
+async function saveSetting(key, value) {
+  settings = { ...settings, ...(await post("/api/settings", { [key]: value })) };
+  showSettings();
+}
+document.querySelectorAll("[data-setting]").forEach(el => el.onchange = () =>
+  saveSetting(el.dataset.setting, el.type === "checkbox" ? el.checked : el.value.trim()));
+$("chooseDir").onclick = async () => {
+  try {
+    const r = await post("/api/choose-folder", {});
+    if (!r.cancelled) { settings = { ...settings, ...r }; showSettings(); }
+  } catch (err) { alert(err.message); }
+};
+$("updateBtn").onclick = async () => {
+  $("updateBtn").disabled = true; $("updMsg").textContent = "Updating… this can take a minute.";
+  try {
+    const r = await post("/api/update", {});
+    const changed = r.version !== settings.version;
+    settings.version = r.version; showSettings();
+    $("updMsg").textContent = changed ? `Updated to ${r.version}.` : "Already up to date.";
+  } catch (err) { $("updMsg").textContent = err.message; }
+  $("updateBtn").disabled = false;
+};
+
+fetch("/api/settings").then(r => r.json()).then(s => { settings = s; showSettings(); poll(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# Personal settings (contains your download folder path)
+settings.json
+
+# Python
+__pycache__/
+*.pyc
+
+# Downloads, in case the download folder is set inside the project
+*.part
+*.ytdl
+.downloaded.txt
+
+# Editor / OS / tooling
+.DS_Store
+.vscode/
+.idea/
+.claude/
